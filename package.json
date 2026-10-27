@@ -1,0 +1,12 @@
+{
+  "name": "study-dungeon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Turn your notes or PDF into a playable text RPG where every concept is a monster and every correct answer is a hit.",
+  "scripts": {
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "test:server": "npm --prefix server test",
+    "seed": "npm --prefix server run seed"
+  }
+}
