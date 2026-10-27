@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem('sd_token'));
@@ -17,7 +18,7 @@ export function AuthProvider({ children }) {
         return;
       }
       try {
-        const res = await fetch('/api/auth/me', {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -37,7 +38,7 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   async function login(email, password) {
-    const res = await fetch('/api/auth/login', {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -56,7 +57,7 @@ export function AuthProvider({ children }) {
   }
 
   async function register(email, password, display_name) {
-    const res = await fetch('/api/auth/register', {
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, display_name }),
@@ -94,7 +95,7 @@ export function AuthProvider({ children }) {
       headers['Content-Type'] = 'application/json';
     }
 
-    const res = await fetch(endpoint, {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers,
     });
