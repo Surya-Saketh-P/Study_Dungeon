@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 import pdfParse from 'pdf-parse';
+import PDFParser from 'pdf2json';
+import { execFile } from 'child_process';
 import { Dungeon } from '../models/index.js';
 import { chunkText, normalizeText } from './chunker.js';
 import { generateChunkContent } from './llm.js';
@@ -8,11 +10,73 @@ export function calculateSourceHash(text) {
   return crypto.createHash('sha256').update(normalizeText(text)).digest('hex');
 }
 
+/**
+ * Parses PDF buffer using pdf2json
+ */
+function parsePdfWithPdf2Json(buffer) {
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser(null, 1);
+    pdfParser.on('pdfParser_dataError', (errData) => reject(errData.parserError));
+    pdfParser.on('pdfParser_dataReady', () => {
+      const text = pdfParser.getRawTextContent();
+      resolve(text);
+    });
+    pdfParser.parseBuffer(buffer);
+  });
+}
+
+/**
+ * Parses PDF buffer using system pdftotext if available
+ */
+function parsePdfWithPdftotext(buffer) {
+  return new Promise((resolve, reject) => {
+    const child = execFile('pdftotext', ['-', '-'], (error, stdout) => {
+      if (error) return reject(error);
+      resolve(stdout);
+    });
+    if (child.stdin) {
+      child.stdin.write(buffer);
+      child.stdin.end();
+    }
+  });
+}
+
 export async function extractTextFromSource({ buffer, text, mimeType }) {
   if (buffer) {
     if (mimeType === 'application/pdf' || buffer.slice(0, 4).toString() === '%PDF') {
-      const data = await pdfParse(buffer);
-      return data.text;
+      // 1. Try pdf-parse first (PRD default)
+      try {
+        const data = await pdfParse(buffer);
+        if (data.text && data.text.trim().length >= 50) {
+          return data.text;
+        }
+      } catch (err) {
+        console.warn('pdf-parse encountered error, falling back to modern parser:', err.message);
+      }
+
+      // 2. Fall back to pdf2json (handles modern XRef and long tokens)
+      try {
+        const parsedText = await parsePdfWithPdf2Json(buffer);
+        if (parsedText && parsedText.trim().length >= 50) {
+          return parsedText;
+        }
+      } catch (err) {
+        console.warn('pdf2json fallback failed, trying system pdftotext:', err.message);
+      }
+
+      // 3. Fall back to system pdftotext
+      try {
+        const systemText = await parsePdfWithPdftotext(buffer);
+        if (systemText && systemText.trim().length >= 50) {
+          return systemText;
+        }
+      } catch (err) {
+        console.warn('pdftotext fallback failed:', err.message);
+      }
+
+      throw new Error(
+        'Could not extract text from this PDF. It appears to be scanned or image-only. Please paste the notes text directly.'
+      );
     }
     return buffer.toString('utf8');
   }
