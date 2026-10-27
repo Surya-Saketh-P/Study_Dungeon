@@ -128,15 +128,24 @@ export async function processDungeonGeneration(dungeonId, rawSourceText) {
     let allConcepts = [];
     let successfulChunks = 0;
 
-    for (let i = 0; i < chunks.length; i++) {
+    // Process all chunks concurrently in parallel to complete under 25s
+    const chunkPromises = chunks.map(async (chunk, i) => {
       try {
-        const chunkResult = await generateChunkContent(chunks[i]);
+        const chunkResult = await generateChunkContent(chunk);
         if (chunkResult && chunkResult.concepts && chunkResult.concepts.length > 0) {
-          allConcepts.push(...chunkResult.concepts);
-          successfulChunks++;
+          return { success: true, concepts: chunkResult.concepts };
         }
       } catch (chunkErr) {
         console.warn(`Chunk ${i + 1} processing error:`, chunkErr.message);
+      }
+      return { success: false, concepts: [] };
+    });
+
+    const chunkResults = await Promise.all(chunkPromises);
+    for (const res of chunkResults) {
+      if (res.success) {
+        allConcepts.push(...res.concepts);
+        successfulChunks++;
       }
     }
 

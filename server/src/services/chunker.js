@@ -72,6 +72,6 @@ export function chunkText(rawText, maxChunkSize = 5000, overlap = 400) {
     }
   }
 
-  // Limit max chunks to 4 for reliability and fast completion (<60s)
-  return chunks.slice(0, 4);
+  // Limit max chunks to 3 for optimal 3-floor dungeon and fast parallel completion (<20s)
+  return chunks.slice(0, 3);
 }
