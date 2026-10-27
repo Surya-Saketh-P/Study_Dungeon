@@ -12,8 +12,8 @@
 
 ## 📽️ Demo Video
 
-- **Video Walkthrough Link**: `[Insert Your Demo Video Link Here — e.g. Loom / YouTube / Google Drive]`
-- **Duration**: ~3–5 minutes
+- **Video Walkthrough Link**: https://docs.google.com/videos/d/19wLJS1ZRdHv0CmZ19t0vWiWCWprzp7WtxCGpx3jzi-Y/edit?usp=drive_link
+- **Duration**: 4 minutes
 - **What is Demonstrated**:
   1. Overview of the problem and target users
   2. PDF upload and study notes ingestion into the parallel AI pipeline
