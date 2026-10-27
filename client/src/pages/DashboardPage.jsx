@@ -58,6 +58,26 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleDeleteDungeon(dungeonId, title) {
+    if (!window.confirm(`Are you sure you want to delete quest "${title}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await api(`/api/dungeons/${dungeonId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setDungeons((prev) => prev.filter((d) => d.id !== dungeonId));
+      } else {
+        alert(data.error || 'Failed to delete dungeon');
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
   return (
     <div className="container">
       {/* Dashboard Top Header */}
@@ -153,7 +173,7 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', alignItems: 'center' }}>
                   {isReady && (
                     <>
                       <Link 
@@ -173,8 +193,27 @@ export default function DashboardPage() {
                     </>
                   )}
                   {isProcessing && (
-                    <button disabled className="btn btn-secondary" style={{ width: '100%', opacity: 0.6, fontSize: '0.8rem' }}>
-                      Summoning Monsters...
+                    <button disabled className="btn btn-secondary" style={{ flex: 1, opacity: 0.6, fontSize: '0.8rem' }}>
+                      Summoning...
+                    </button>
+                  )}
+                  {isFailed && (
+                    <button 
+                      onClick={() => handleDeleteDungeon(dungeon.id, dungeon.title)} 
+                      className="btn btn-danger" 
+                      style={{ flex: 1, padding: '0.6rem 0.8rem', fontSize: '0.8rem' }}
+                    >
+                      🗑️ Remove Failed Quest
+                    </button>
+                  )}
+                  {dungeon.user_id !== '0' && dungeon.user_id !== 0 && !isFailed && (
+                    <button
+                      title="Delete quest"
+                      onClick={() => handleDeleteDungeon(dungeon.id, dungeon.title)}
+                      className="btn btn-secondary"
+                      style={{ padding: '0.6rem', fontSize: '0.8rem', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                    >
+                      🗑️
                     </button>
                   )}
                 </div>

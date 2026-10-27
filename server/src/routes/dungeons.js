@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { Dungeon, Mastery } from '../models/index.js';
+import { Dungeon, Mastery, Run, Attempt } from '../models/index.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { extractTextFromSource, processDungeonGeneration } from '../services/pipeline.js';
 import { startDungeonRun } from './runs.js';
@@ -100,6 +100,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
       return {
         id: d._id.toString(),
+        user_id: d.user_id ? d.user_id.toString() : '0',
         title: d.title,
         status: d.status,
         error_message: d.error_message,
@@ -170,6 +171,42 @@ router.get('/:id', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Get dungeon error:', err);
     return res.status(500).json({ error: 'Failed to retrieve dungeon details' });
+  }
+});
+
+// DELETE /api/dungeons/:id - Delete a user dungeon and its run attempts
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const dungeonId = req.params.id;
+    const userId = req.user.id;
+
+    const dungeon = await Dungeon.findById(dungeonId);
+    if (!dungeon) {
+      return res.status(404).json({ error: 'Dungeon not found' });
+    }
+
+    if (dungeon.user_id === 0 || dungeon.user_id === '0') {
+      return res.status(403).json({ error: 'Cannot delete the pre-seeded demo dungeon' });
+    }
+
+    if (dungeon.user_id.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'Access denied: You can only delete your own dungeons' });
+    }
+
+    // Delete associated runs and attempts
+    const runs = await Run.find({ dungeon_id: dungeon._id });
+    const runIds = runs.map((r) => r._id);
+    if (runIds.length > 0) {
+      await Attempt.deleteMany({ run_id: { $in: runIds } });
+      await Run.deleteMany({ dungeon_id: dungeon._id });
+    }
+
+    await Dungeon.findByIdAndDelete(dungeon._id);
+
+    return res.json({ message: 'Dungeon successfully deleted', id: dungeonId });
+  } catch (err) {
+    console.error('Delete dungeon error:', err);
+    return res.status(500).json({ error: 'Failed to delete dungeon' });
   }
 });
 
