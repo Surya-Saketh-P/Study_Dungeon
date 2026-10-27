@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
-import { pool } from '../db.js';
+import { User } from '../models/index.js';
 import { authenticateToken, generateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -28,21 +28,25 @@ router.post('/register', async (req, res) => {
     const { email, password, display_name } = parseResult.data;
     const finalDisplayName = display_name || email.split('@')[0];
 
-    // Check if user already exists
-    const [existing] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0) {
+    const existing = await User.findOne({ email });
+    if (existing) {
       return res.status(409).json({ error: 'User with this email already exists' });
     }
 
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    const [result] = await pool.execute(
-      'INSERT INTO users (email, password_hash, display_name) VALUES (?, ?, ?)',
-      [email, passwordHash, finalDisplayName]
-    );
+    const userRecord = await User.create({
+      email,
+      password_hash: passwordHash,
+      display_name: finalDisplayName,
+    });
 
-    const user = { id: result.insertId, email, display_name: finalDisplayName };
+    const user = {
+      id: userRecord._id.toString(),
+      email: userRecord.email,
+      display_name: userRecord.display_name,
+    };
     const token = generateToken(user);
 
     return res.status(201).json({ token, user });
@@ -62,23 +66,18 @@ router.post('/login', async (req, res) => {
 
     const { email, password } = parseResult.data;
 
-    const [rows] = await pool.execute(
-      'SELECT id, email, password_hash, display_name FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (rows.length === 0) {
+    const userRecord = await User.findOne({ email });
+    if (!userRecord) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const userRecord = rows[0];
     const passwordMatch = await bcrypt.compare(password, userRecord.password_hash);
     if (!passwordMatch) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const user = {
-      id: userRecord.id,
+      id: userRecord._id.toString(),
       email: userRecord.email,
       display_name: userRecord.display_name,
     };
@@ -94,16 +93,19 @@ router.post('/login', async (req, res) => {
 // GET /api/auth/me
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    const [rows] = await pool.execute(
-      'SELECT id, email, display_name, created_at FROM users WHERE id = ?',
-      [req.user.id]
-    );
-
-    if (rows.length === 0) {
+    const userRecord = await User.findById(req.user.id).select('-password_hash');
+    if (!userRecord) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    return res.json({ user: rows[0] });
+    return res.json({
+      user: {
+        id: userRecord._id.toString(),
+        email: userRecord.email,
+        display_name: userRecord.display_name,
+        created_at: userRecord.created_at,
+      },
+    });
   } catch (err) {
     console.error('Auth me error:', err);
     return res.status(500).json({ error: 'Failed to retrieve user profile' });

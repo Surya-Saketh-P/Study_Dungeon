@@ -1,10 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { initDatabase, pool } from './db.js';
+import mongoose from 'mongoose';
+import { connectDB } from './db.js';
 
 import authRouter from './routes/auth.js';
 import dungeonsRouter from './routes/dungeons.js';
+import runsRouter from './routes/runs.js';
 
 dotenv.config();
 
@@ -18,24 +20,17 @@ app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 // Mount routes
 app.use('/api/auth', authRouter);
 app.use('/api/dungeons', dungeonsRouter);
+app.use('/api/runs', runsRouter);
 
 // Health check endpoint
-app.get('/api/health', async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT 1 as is_alive');
-    res.json({
-      status: 'ok',
-      service: 'study-dungeon-api',
-      timestamp: new Date().toISOString(),
-      database: rows[0].is_alive === 1 ? 'connected' : 'unknown',
-    });
-  } catch (err) {
-    res.status(500).json({
-      status: 'error',
-      message: 'Database health check failed',
-      error: err.message,
-    });
-  }
+app.get('/api/health', (req, res) => {
+  const isDbConnected = mongoose.connection.readyState === 1;
+  res.json({
+    status: isDbConnected ? 'ok' : 'degraded',
+    service: 'study-dungeon-api',
+    database: isDbConnected ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Global error handler
@@ -48,7 +43,7 @@ app.use((err, req, res, next) => {
 
 async function start() {
   try {
-    await initDatabase();
+    await connectDB();
     app.listen(PORT, () => {
       console.log(`Study Dungeon API running on http://localhost:${PORT}`);
     });
